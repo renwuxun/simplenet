@@ -99,7 +99,7 @@ class SimpleNet_Http {
             }
         }
 
-        if (!isset($headers['Host']) || !isset($headers['host'])) {
+        if (!isset($headers['Host']) && !isset($headers['host'])) {
             $headers['Host'] = $this->tcp->getHost();
         }
 
