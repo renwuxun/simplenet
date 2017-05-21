@@ -21,13 +21,12 @@ class SimpleNet_Http {
      */
     protected $tcp;
 
-    protected $errno = 0;
-    protected $errstr = '';
+    protected $error = '';
 
-    protected $lastSendHeader = '';
-    protected $lastSendBody = '';
-    protected $lastRecvHeader = '';
-    protected $lastRecvBody = '';
+    protected $sendHeader = '';
+    protected $sendBody = '';
+    protected $recvHeader = '';
+    protected $recvBody = '';
 
     protected $cookies = array();
     protected $enableCookie = true;
@@ -58,8 +57,8 @@ class SimpleNet_Http {
                 unset($this->cookies[$key]);
             }
         }
-        if ($this->lastRecvHeader != '') {
-            preg_match_all('/Set\-Cookie:\s*([^=]+)=([^;]+);(?:\s*expires=([^;]+);)?/is', $this->lastRecvHeader, $m);
+        if ($this->recvHeader != '') {
+            preg_match_all('/Set\-Cookie:\s*([^=]+)=([^;]+);(?:\s*expires=([^;]+);)?/is', $this->recvHeader, $m);
             foreach ($m[1] as $k=>$v) {
                 $endtime = 2145891661;
                 if ($m[3][$k] != '') {
@@ -70,6 +69,13 @@ class SimpleNet_Http {
         }
     }
 
+    /**
+     * @param string $uri
+     * @param array $headers
+     * @param string|array $data
+     * @param string $method
+     * @return bool
+     */
     public function request($uri = '/', $headers = array(), $data = '', $method = '') {
         if ($this->enableCookie) {
             $this->checkCookie();
@@ -92,103 +98,84 @@ class SimpleNet_Http {
                 $sendBody = http_build_query($sendBody);
             }
         }
+
+        if (!isset($headers['Host']) || !isset($headers['host'])) {
+            $headers['Host'] = $this->tcp->getHost();
+        }
+
         $sendHeader = self::buildHeader($uri, $headers, strlen($sendBody), $method);
         unset($headers);
 
-        $r = $this->requestRaw($sendHeader.$sendBody);
-
-        $pos = strpos($r, "\r\n\r\n");
-        if ($pos < 11) { //HTTP/1.1 404
-            if ($this->errno == 0) {
-                $this->errno = 300;
-                $this->errstr = 'bad response: ['.$r.']';
-            }
-            $this->tcp->close();
-            return '';
+        if (!$this->requestRaw($sendHeader.$sendBody)) {
+            return false;
         }
 
-        $this->lastSendHeader = $sendHeader;
-        $this->lastSendBody = $sendBody;
-        $this->lastRecvHeader = substr($r, 0, $pos+4);
-        $this->lastRecvBody = substr($r, $pos+4);
-        unset($sendHeader,$sendBody,$r);
-
-        if (0 != $this->errno
-            || $this->tcp->feof()
-            || preg_match('/Connection:\s*close/i', $this->lastRecvHeader)
-        ) {
+        if ($this->tcp->feof() || preg_match('/Connection:\s*close/i', $this->recvHeader)) {
             $this->tcp->close();
         }
 
-        if (preg_match('/Content-Encoding:\s*(gzip|deflate)/i', $this->lastRecvHeader, $m)) {
+        if (preg_match('/Content-Encoding:\s*(gzip|deflate)/i', $this->recvHeader, $m)) {
             switch ($m[1]) {
                 case 'gzip':
-                    $this->lastRecvBody = gzdecode($this->lastRecvBody);
+                    $this->recvBody = gzdecode($this->recvBody);
                     break;
                 case 'deflate':
-                    $this->lastRecvBody = gzinflate($this->lastRecvBody);
+                    $this->recvBody = gzinflate($this->recvBody);
                     break;
                 default:
-                    throw new Exception('unsupported Content-Encoding: '.$m[1]);
+                    $this->error = 'unknown Content-Encoding: [' . $m[1] . ']';
+                    return false;
             }
         }
 
         $this->statusCode = 0;
         $this->statusText = '';
-        if (preg_match('/^HTTP\/[^\s]+\s+(\d+)\s+([^\r\n]+)\r\n/i', $this->lastRecvHeader, $m)) {
+        if (preg_match('/^HTTP\/[^\s]+\s+(\d+)\s+([^\r\n]+)\r\n/i', $this->recvHeader, $m)) {
             $this->statusCode = (int)$m[1];
             $this->statusText = trim($m[2]);
         }
 
-        return $this->lastRecvBody;
+        return true;
     }
 
+    /**
+     * @param string $msg
+     * @return bool
+     */
     public function requestRaw($msg) {
-        $this->errno = 0;
-        $this->errstr = '';
+        $this->error = '';
 
         if ($this->tcp->isClose()) {
             if (!$this->tcp->connect()) {
-                $this->errno = $this->tcp->getErrno();
-                $this->errstr = $this->tcp->getErrstr();
-                throw new RuntimeException($this->tcp->getErrstr());
+                $this->error = $this->tcp->getError();
+                return false;
             }
         }
 
-        $header = '';
-        $body = '';
-        do {
-            $this->tcp->send($msg);
-            if (0 != $this->tcp->getErrno()) {
-                $this->errno = $this->tcp->getErrno();
-                $this->errstr = $this->tcp->getErrstr();
-                break;
-            }
+        if (!$this->tcp->send($msg)) {
+            $this->error = $this->tcp->getError();
+            return false;
+        }
 
-            $header = $this->readHeader();
-            if (0 != $this->tcp->getErrno()) {
-                $this->errno = $this->tcp->getErrno();
-                $this->errstr = $this->tcp->getErrstr();
-                break;
-            }
+        if (!$this->readHeader()) {
+            return false;
+        }
 
-            if (preg_match('/Content-Length:\s*(\d+)/i', $header,$m)){
-                $body = $this->tcp->recv(intval($m[1]));
-            } elseif (preg_match('/Transfer-Encoding:\s*chunked/i', $header)) {
-                $body = $this->readChunkedBody();
-            } else {
-                $this->errno = 200;
-                $this->errstr = 'parse header error [readBody]';
-                break;
+        if (preg_match('/Content-Length:\s*(\d+)/i', $this->recvHeader,$m)){
+            if (!$this->tcp->recv(intval($m[1]))) {
+                $this->error = $this->tcp->getError();
+                return false;
             }
-            if ($this->tcp->getErrno() != 0) {
-                $this->errno = $this->tcp->getErrno();
-                $this->errstr = $this->tcp->getErrstr();
-                break;
-            }
-        } while (0);
+            $this->recvBody = $this->tcp->getRecvData();
+        } elseif (preg_match('/Transfer-Encoding:\s*chunked/i', $this->recvHeader)) {
+            return $this->readChunkedBody();
+        } else {
+            $this->error = 'bad response [' . $this->recvHeader . ']';
+            $this->tcp->close(); // 响应协议错误
+            return false;
+        }
 
-        return $header.$body;
+        return true;
     }
 
     /**
@@ -223,45 +210,51 @@ class SimpleNet_Http {
     }
 
     /**
-     * @return string
+     * @param int $maxLine
+     * @return bool
      */
-    protected function readHeader() {
-        $header = '';
+    protected function readHeader($maxLine = 8192) {
+        $this->recvHeader = '';
         do {
-            $line = $this->tcp->fgets(8192);
-            $header .= $line;
-            if ($line == "\r\n") {
-                break;
+            if (!$this->tcp->fgets($maxLine)) {
+                $this->error = $this->tcp->getError();
+                return false;
             }
-            if ($this->tcp->getErrno() != 0) {
+            $this->recvHeader .= $this->tcp->getRecvData();
+            if ($this->tcp->getRecvData() == "\r\n") {
                 break;
             }
         } while (!$this->tcp->feof());
-        return $header;
+        return true;
     }
 
+    /**
+     * @return bool
+     */
     protected function readChunkedBody() {
-        $body = '';
+        $this->recvBody = '';
         do {
-            $_chunk_size = intval(hexdec($this->tcp->fgets(8192)));
-            if ($this->tcp->getErrno() != 0) {
-                break;
+            if (!$this->tcp->fgets(512)) {
+                $this->error = $this->tcp->getError();
+                return false;
             }
+            $_chunk_size = intval(hexdec($this->tcp->getRecvData()));
             if ($_chunk_size > 0) {
-                $body .= $this->tcp->recv($_chunk_size);
-                if ($this->tcp->getErrno() != 0) {
-                    break;
+                if (!$this->tcp->recv($_chunk_size)) {
+                    $this->error = $this->tcp->getError();
+                    return false;
                 }
+                $this->recvBody .= $this->tcp->getRecvData();
             }
-            $this->tcp->recv(2); // skip \r\n
-            if ($this->tcp->getErrno() != 0) {
-                break;
+            if (!$this->tcp->recv(2)) { // skip \r\n
+                $this->error = $this->tcp->getError();
+                return false;
             }
             if ($_chunk_size < 1) {
                 break;
             }
         } while (!$this->tcp->feof());
-        return $body;
+        return true;
     }
 
     /**
@@ -281,53 +274,46 @@ class SimpleNet_Http {
     }
 
     /**
-     * @return int
+     * @return string
      */
-    public function getErrno() {
-        return $this->errno;
+    public function getError() {
+        return $this->error;
     }
 
     /**
      * @return string
      */
-    public function getErrstr() {
-        return $this->errstr;
+    public function getSend() {
+        return $this->sendHeader.$this->sendBody;
+    }
+
+    public function getSendHeader() {
+        return $this->sendHeader;
+    }
+
+    public function getSendBody() {
+        return $this->sendBody;
     }
 
     /**
      * @return string
      */
-    public function getLastSend() {
-        return $this->lastSendHeader.$this->lastSendBody;
-    }
-
-    public function getLastSendHeader() {
-        return $this->lastSendHeader;
-    }
-
-    public function getLastSendBody() {
-        return $this->lastSendBody;
+    public function getRecv() {
+        return $this->recvHeader.$this->recvBody;
     }
 
     /**
      * @return string
      */
-    public function getLastRecv() {
-        return $this->lastRecvHeader.$this->lastRecvBody;
+    public function getRecvHeader() {
+        return $this->recvHeader;
     }
 
     /**
      * @return string
      */
-    public function getLastRecvHeader() {
-        return $this->lastRecvHeader;
-    }
-
-    /**
-     * @return string
-     */
-    public function getLastRecvBody() {
-        return $this->lastRecvBody;
+    public function getRecvBody() {
+        return $this->recvBody;
     }
 
     /**
