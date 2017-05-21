@@ -6,12 +6,17 @@ class SimpleNet_Tcp {
 
     protected $fp;
     protected $host = '';
-    protected $port = 0;
+    protected $port = -1;
 
     protected $error = '';
 
     protected $sendData = '';
     protected $recvData = '';
+
+    public function __construct($host, $port = -1) {
+        $this->host = $host;
+        $this->port = $port;
+    }
 
     /**
      * @param int $timeoutsec
@@ -32,19 +37,23 @@ class SimpleNet_Tcp {
             $this->fp = @fsockopen($this->host, $this->port, $errno, $this->error, $timeoutsec);
             if (false === $this->fp) {
                 if (0 == $errno) {
-                    $this->error = 'error before connect';
+                    $this->error = "error happened before connect, please check your host {$this->host}";
                 } else {
                     switch ($errno) {
                         case -3:
-                            $this->error = "socket creation failed (-3)";
+                            $this->error = "socket creation failed ($errno)";
                             break;
                         case -4:
-                            $this->error = "dns lookup failure (-4)";
+                            $this->error = "dns lookup failure ($errno)";
                             break;
                         case -5:
-                            $this->error = "connection refused or timed out (-5)";
+                            $this->error = "connection refused or timed out ($errno)";
                             break;
-                        default:;
+                        case 10060:
+                            $this->error = "no server running port {$this->port} ($errno)";
+                            break;
+                        default:
+                            $this->error = "could not open connection to {$this->host}:{$this->port} ($errno)";
                     }
                 }
                 break;
@@ -84,7 +93,11 @@ class SimpleNet_Tcp {
         $wrote = 0;
 
         do {
-            @stream_set_timeout($this->fp, $timeoutsec);
+            if (!@stream_set_timeout($this->fp, $timeoutsec)) {
+                $this->error = 'set fwrite timeout error';
+                $this->close();
+                return false;
+            }
             $_wrote = fwrite($this->fp, $this->sendData, $length-$wrote);
             if ($_wrote === false) {
                 $this->error = 'fwrite() error [send]';
@@ -114,7 +127,11 @@ class SimpleNet_Tcp {
         $this->recvData = '';
 
         do {
-            @stream_set_timeout($this->fp, $timeoutsec);
+            if (!@stream_set_timeout($this->fp, $timeoutsec)) {
+                $this->error = 'set fread timeout error';
+                $this->close();
+                return false;
+            }
             $tmp = fread($this->fp, $length - $got);
             if (false === $tmp) {
                 $this->error = 'fread() error [recv]';
@@ -139,7 +156,12 @@ class SimpleNet_Tcp {
     public function fgets($maxLength = null, $timeoutsec = 5) {
         $this->error = '';
 
-        @stream_set_timeout($this->fp, $timeoutsec);
+        if (!@stream_set_timeout($this->fp, $timeoutsec)) {
+            $this->error = 'set fget timeout error';
+            $this->close();
+            return false;
+        }
+
         $this->recvData = fgets($this->fp, $maxLength);
 
         if (false === $this->recvData) {
@@ -167,22 +189,6 @@ class SimpleNet_Tcp {
     }
 
     /**
-     * @return resource
-     */
-    public function getFp() {
-        return $this->fp;
-    }
-
-    /**
-     * @param resource $fp
-     * @return $this
-     */
-    public function setFp($fp) {
-        $this->fp = $fp;
-        return $this;
-    }
-
-    /**
      * @return string
      */
     public function getHost() {
@@ -190,28 +196,10 @@ class SimpleNet_Tcp {
     }
 
     /**
-     * @param string $host
-     * @return $this
-     */
-    public function setHost($host) {
-        $this->host = $host;
-        return $this;
-    }
-
-    /**
      * @return int
      */
     public function getPort() {
         return (int)$this->port;
-    }
-
-    /**
-     * @param int $port
-     * @return $this
-     */
-    public function setPort($port) {
-        $this->port = (int)$port;
-        return $this;
     }
 
     /**

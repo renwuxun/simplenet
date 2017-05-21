@@ -77,16 +77,22 @@ class SimpleNet_Http {
      * @return bool
      */
     public function request($uri = '/', $headers = array(), $data = '', $method = '') {
+        $_headers = array();
+        foreach($headers as $k=>$v) {
+            $_headers[ucwords($k, '-')] = $v;
+        }
+        unset($headers);
+
         if ($this->enableCookie) {
             $this->checkCookie();
             foreach ($this->cookies as $key => $val) {
-                if (!isset($headers['Cookie'])) {
-                    $headers['Cookie'] = '';
+                if (!isset($_headers['Cookie'])) {
+                    $_headers['Cookie'] = '';
                 }
-                if ('' != $headers['Cookie']) {
-                    $headers['Cookie'] .= '; ';
+                if ('' != $_headers['Cookie']) {
+                    $_headers['Cookie'] .= '; ';
                 }
-                $headers['Cookie'] .= $key.'='.substr($val, 10);
+                $_headers['Cookie'] .= $key.'='.substr($val, 10);
             }
         }
 
@@ -99,12 +105,12 @@ class SimpleNet_Http {
             }
         }
 
-        if (!isset($headers['Host']) && !isset($headers['host'])) {
-            $headers['Host'] = $this->tcp->getHost();
+        if (!isset($_headers['Host'])) {
+            $_headers['Host'] = preg_replace('#\w+://#', '', $this->getTcp()->getHost());
         }
 
-        $sendHeader = self::buildHeader($uri, $headers, strlen($sendBody), $method);
-        unset($headers);
+        $sendHeader = self::buildHeader($uri, $_headers, strlen($sendBody), $method);
+        unset($_headers);
 
         if (!$this->requestRaw($sendHeader.$sendBody)) {
             return false;

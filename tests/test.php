@@ -13,7 +13,7 @@ require __DIR__.'/../vendor/autoload.php';
 $http = new SimpleNet_Http();
 
 $http->enableCookie()
-    ->setTcp((new SimpleNet_Tcp())->setHost('g.phpoy.com')->setPort(80));
+    ->setTcp(new SimpleNet_Tcp('g.phpoy.com', 80));
 
 echo '----------------------------------default'.PHP_EOL;
 if ($http->request('/')) {
@@ -38,7 +38,7 @@ if ($http->request('/abc')) {
 
 
 $http->getTcp()->close();
-$http->setTcp((new SimpleNet_Tcp())->setHost('gg.phpoy.com')->setPort(80));
+$http->setTcp(new SimpleNet_Tcp('gg.phpoy.com', 80));
 
 echo '----------------------------------host error'.PHP_EOL;
 if ($http->request('/')) {
@@ -49,7 +49,7 @@ if ($http->request('/')) {
 
 
 $http->getTcp()->close();
-$http->setTcp((new SimpleNet_Tcp())->setHost('g.phpoy.com')->setPort(8080));
+$http->setTcp(new SimpleNet_Tcp('g.phpoy.com', 8000));
 
 echo '----------------------------------port error'.PHP_EOL;
 if ($http->request('/')) {
