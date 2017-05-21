@@ -1,84 +1,96 @@
 <?php
 
 
-
 class SimpleNet_Udp {
+    
+    protected $host = '';
+    protected $port = -1;
+    protected $error = '';
+    protected $fp;
+    protected $sendData = '';
 
-	/**
-	 * @var self[]
-	 */
-	protected static $instances=array();
+    public function __construct($host, $port) {
+        $this->host = $host;
+        $this->port = $port;
+    }
 
-	protected $strHost='';
-	protected $iPort=0;
-	protected $iTimeout;
-	protected $iLastErrNo = 0;
-	protected $strLastErr = '';
-	protected $fp;
+    /**
+     * @param int $timeoutsec
+     */
+    public function connect($timeoutsec = 3) {
+        do {
+            /**
+             * http://php.net/manual/zh/function.fsockopen.php
+             * Note:
+             * 注意：如果你要对建立在套接字基础上的读写操作设置操作时间设置连接时限，
+             * 请使用stream_set_timeout()，
+             * fsockopen()的连接时限（timeout）的参数仅仅在套接字连接的时候生效。
+             */
+            $this->fp = @fsockopen('udp://' . $this->host, $this->port, $errno, $this->error, $timeoutsec);
+            if (false === $this->fp) {
+                if (0 == $errno) {
+                    $this->error = 'error before connect';
+                } else {
+                    switch ($errno) {
+                        case -3:
+                            $this->error = "socket creation failed (-3)";
+                            break;
+                        case -4:
+                            $this->error = "dns lookup failure (-4)";
+                            break;
+                        case -5:
+                            $this->error = "connection refused or timed out (-5)";
+                            break;
+                        default:;
+                    }
+                }
+                break;
+            }
+        } while (0);
+    }
 
-	public static function getInstance($strHost, $iPort, $iTimeout = 1) {
-		$key = static::getKey($strHost, $iPort, $iTimeout);
-		if (!isset(static::$instances[$key])) {
-			static::$instances[$key] = new static($strHost, $iPort, $iTimeout);
-		}
-		return static::$instances[$key];
-	}
-
-	protected static function getKey($strHost, $iPort, $iTimeout) {
-		return $strHost.'-'.$iPort.'-'.$iTimeout;
-	}
-
-	protected function __construct($strHost, $iPort, $iTimeout = 1){
-		$this->strHost = $strHost;
-		$this->iPort = $iPort;
-		$this->iTimeout = $iTimeout;
-	}
-
-
-	public function connect() {
-		$this->fp = @fsockopen('udp://' . $this->strHost, $this->iPort, $this->iLastErrNo, $this->strLastErr, $this->iTimeout);
-        $errData = error_get_last();
-        if ($errData){
-            $this->iLastErrNo = $errData['type'];
-            $this->strLastErr = $errData['file'].':'.$errData['line'].', '.$errData['message'];
-        }
-		return is_resource($this->fp);
-	}
-
-    public function send($msg) {
-        $length = strlen($msg);
+    /**
+     * @param $msg
+     * @param int $timeoutsec
+     * @return bool
+     */
+    public function send($msg, $timeoutsec = 3) {
+        $this->sendData = $msg;
+        unset($msg);
+        $length = strlen($this->sendData);
         $wrote = 0;
 
-        if (!@stream_set_timeout($this->fp, $this->iTimeout)) {
-            $errData = error_get_last();
-            $this->iLastErrNo = $errData['type'];
-            $this->strLastErr = $errData['file'].':'.$errData['line'].', '.$errData['message'];
-            return $wrote;
-        }
-
-        while ($wrote<$length) {
-            $wrote += fwrite($this->fp, $msg, $length-$wrote);
-            $msg = substr($msg, $wrote);
+        while ($wrote < $length) {
+            if (!@stream_set_timeout($this->fp, $timeoutsec)) {
+                $this->error = 'set timeout error';
+                return false;
+            }
+            $wrote += fwrite($this->fp, $this->sendData, $length - $wrote);
+            $this->sendData = substr($this->sendData, $wrote);
             $info = stream_get_meta_data($this->fp);
             if ($info['timed_out']) {
-                $this->iLastErrNo = 20;
-                $this->strLastErr = 'udp send timeout';
-                break;
+                $this->error = 'udp send timeout';
+                return false;
             }
         }
 
-        return $wrote;
+        return true;
     }
 
-	public function close() {
-		if (is_resource($this->fp)) {
-			fclose($this->fp);
-			$this->fp = null;
-			unset(static::$instances[static::getKey($this->strHost,$this->iPort,$this->iTimeout)]);
-		}
-	}
+    public function close() {
+        if (is_resource($this->fp)) {
+            fclose($this->fp);
+        }
+    }
 
-	public function isConnected(){
-		return is_resource($this->fp);
-	}
+    public function isConnected() {
+        return is_resource($this->fp);
+    }
+
+    /**
+     * @return string
+     */
+    public function getSendData() {
+        return $this->sendData;
+    }
 }
