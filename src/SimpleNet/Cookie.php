@@ -76,6 +76,7 @@ class SimpleNet_Cookie {
                 $val = $_v;
                 break;
             }
+            !is_numeric($expires) && $expires = strtotime($expires);
             $cookies[] = new self($key, $val, $expires, $domain, $path);
         }
 
