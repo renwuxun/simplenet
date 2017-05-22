@@ -34,6 +34,14 @@ class SimpleNet_Http {
     protected $statusText = '';
 
     /**
+     * SimpleNet_Http constructor.
+     * @param $tcp
+     */
+    public function __construct(SimpleNet_Http $tcp = null) {
+        $this->tcp = $tcp;
+    }
+
+    /**
      * @return $this
      */
     public function enableCookie() {
@@ -275,7 +283,7 @@ class SimpleNet_Http {
      * @param SimpleNet_Tcp $tcp
      * @return $this
      */
-    public function setTcp($tcp) {
+    public function setTcp(SimpleNet_Tcp $tcp) {
         $this->tcp = $tcp;
         return $this;
     }
