@@ -84,12 +84,11 @@ class SimpleNet_Tcp {
      * @return bool
      */
     public function send($msg, $timeoutsec = 5) {
-        $this->sendData = $msg;
-        unset($msg);
+        $this->sendData = '';
 
         $this->error = '';
 
-        $length = strlen($this->sendData);
+        $length = strlen($msg);
         $wrote = 0;
 
         do {
@@ -98,7 +97,7 @@ class SimpleNet_Tcp {
                 $this->close();
                 return false;
             }
-            $_wrote = fwrite($this->fp, $this->sendData, $length-$wrote);
+            $_wrote = fwrite($this->fp, $msg, $length-$wrote);
             if ($_wrote === false) {
                 $this->error = 'fwrite() error [send]';
                 $info = @stream_get_meta_data($this->fp);
@@ -109,7 +108,8 @@ class SimpleNet_Tcp {
                 return false;
             }
             $wrote += $_wrote;
-            $this->sendData = substr($this->sendData, $wrote);
+            $this->sendData .= substr($msg, 0, $_wrote);
+            $msg = substr($msg, $_wrote);
         } while ($wrote < $length);
 
         return true;
@@ -145,6 +145,7 @@ class SimpleNet_Tcp {
             $this->recvData .= $tmp;
             $got += strlen($tmp);
         } while ($got < $length && !$this->feof());
+
         return true;
     }
 

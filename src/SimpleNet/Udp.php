@@ -29,19 +29,23 @@ class SimpleNet_Udp {
             $this->fp = @fsockopen('udp://' . $this->host, $this->port, $errno, $this->error, $timeoutsec);
             if (false === $this->fp) {
                 if (0 == $errno) {
-                    $this->error = 'error before connect';
+                    $this->error = "error happened before connect, please check your host {$this->host}";
                 } else {
                     switch ($errno) {
                         case -3:
-                            $this->error = "socket creation failed (-3)";
+                            $this->error = "socket creation failed ($errno)";
                             break;
                         case -4:
-                            $this->error = "dns lookup failure (-4)";
+                            $this->error = "dns lookup failure ($errno)";
                             break;
                         case -5:
-                            $this->error = "connection refused or timed out (-5)";
+                            $this->error = "connection refused or timed out ($errno)";
                             break;
-                        default:;
+                        case 10060:
+                            $this->error = "no server running port {$this->port} ($errno)";
+                            break;
+                        default:
+                            $this->error = "could not open connection to {$this->host}:{$this->port} ($errno)";
                     }
                 }
                 break;
@@ -50,29 +54,39 @@ class SimpleNet_Udp {
     }
 
     /**
-     * @param $msg
+     * 请自行确保(!isClose())
+     * @param string $msg
      * @param int $timeoutsec
      * @return bool
      */
-    public function send($msg, $timeoutsec = 3) {
-        $this->sendData = $msg;
-        unset($msg);
-        $length = strlen($this->sendData);
+    public function send($msg, $timeoutsec = 5) {
+        $this->sendData = '';
+
+        $this->error = '';
+
+        $length = strlen($msg);
         $wrote = 0;
 
-        while ($wrote < $length) {
+        do {
             if (!@stream_set_timeout($this->fp, $timeoutsec)) {
-                $this->error = 'set timeout error';
+                $this->error = 'set fwrite timeout error';
+                $this->close();
                 return false;
             }
-            $wrote += fwrite($this->fp, $this->sendData, $length - $wrote);
-            $this->sendData = substr($this->sendData, $wrote);
-            $info = stream_get_meta_data($this->fp);
-            if ($info['timed_out']) {
-                $this->error = 'udp send timeout';
+            $_wrote = fwrite($this->fp, $msg, $length-$wrote);
+            if ($_wrote === false) {
+                $this->error = 'fwrite() error [send]';
+                $info = @stream_get_meta_data($this->fp);
+                if (isset($info['timed_out']) && $info['timed_out']) {
+                    $this->error = 'udp send timeout';
+                }
+                $this->close();
                 return false;
             }
-        }
+            $wrote += $_wrote;
+            $this->sendData .= substr($msg, 0, $_wrote);
+            $msg = substr($msg, $_wrote);
+        } while ($wrote < $length);
 
         return true;
     }
