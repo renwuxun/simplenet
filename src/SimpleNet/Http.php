@@ -23,8 +23,7 @@ class SimpleNet_Http {
 
     protected $error = '';
 
-    protected $sendHeader = '';
-    protected $sendBody = '';
+    protected $sendData = '';
     protected $recvHeader = '';
     protected $recvBody = '';
 
@@ -163,6 +162,8 @@ class SimpleNet_Http {
             return false;
         }
 
+        $this->sendData = $this->tcp->getSendData();
+
         if (!$this->readHeader()) {
             return false;
         }
@@ -290,15 +291,7 @@ class SimpleNet_Http {
      * @return string
      */
     public function getSend() {
-        return $this->sendHeader.$this->sendBody;
-    }
-
-    public function getSendHeader() {
-        return $this->sendHeader;
-    }
-
-    public function getSendBody() {
-        return $this->sendBody;
+        return $this->sendData;
     }
 
     /**
