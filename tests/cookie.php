@@ -25,7 +25,7 @@ Strict-Transport-Security: max-age=172800\r
 BDPAGETYPE: 1\r
 BDQID: 0xcc92d5f20009c530\r
 BDUSERID: 0\r
-Set-Cookie: BDSVRTM=0; path=/\r
+Set-Cookie: aaa=0; Max-Age=7200; path=/; secure; HttpOnly\r
 Set-Cookie: BD_HOME=0; path=/\r
 Set-Cookie: H_PS_PSSID=22778_1433_21090_18560_22159; path=/; domain=.baidu.com\r
 Content-Encoding: gzip\r
@@ -33,6 +33,6 @@ Set-Cookie: __bsi=2373239043788800130_00_0_I_R_3_0303_C02F_N_I_I_0; expires=Tue,
 
 $cs = SimpleNet_Cookie::findCookies($responseHeader);
 foreach ($cs as $c) {
-    echo $c->formatted4request().' [is expires: '.(int)$c->isExpires().']'.PHP_EOL;
+    echo $c->formatted4request().' [is expires: '.(int)$c->isExpired().'] ';
     echo $c->formatted4response().PHP_EOL;
 }

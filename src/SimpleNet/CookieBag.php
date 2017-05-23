@@ -8,43 +8,34 @@
  */
 class SimpleNet_CookieBag {
 
+    /**
+     * @var SimpleNet_Cookie[]
+     */
     protected $cookies = array();
 
     /**
-     * @param string $key
-     * @param string $value
-     * @param int|string $expires
+     * @param SimpleNet_Cookie $cookie
      * @return $this
      */
-    public function put($key, $value, $expires = '') {
-        $endtime = 2145891661;
-        if ($expires != '') {
-            if (is_numeric($expires)) {
-                $endtime = (int)$expires;
-            } else {
-                $endtime = strtotime($expires);
-            }
-        }
-        $this->cookies[$key] = $endtime.$value;
+    public function put(SimpleNet_Cookie $cookie) {
+        $this->cookies[$cookie->getKey()] = $cookie;
         return $this;
     }
 
     /**
      * @param string $key
-     * @return string
+     * @return null|SimpleNet_Cookie
      */
     public function get($key) {
-        return isset($this->cookies[$key]) ? substr($this->cookies[$key], 10): '';
+        return isset($this->cookies[$key]) ? $this->cookies[$key]: null;
     }
 
     /**
      * @return $this
      */
     public function applyTimeout() {
-        $now = time();
-        foreach ($this->cookies as $key => $val) {
-            $time = (int)substr($val, 0, 10);
-            if ($time < $now) {
+        foreach ($this->cookies as $key => $cookie) {
+            if ($cookie->isExpired()) {
                 unset($this->cookies[$key]);
             }
         }
@@ -55,18 +46,21 @@ class SimpleNet_CookieBag {
      * @return string
      */
     public function prepare4request() {
-        $s = '';
-        foreach ($this->cookies as $key=>$val) {
-            $s .= $key.'='.substr($val, 10).',';
+        $arr = array();
+        foreach ($this->cookies as $cookie) {
+            $arr[] = $cookie->formatted4request();
         }
-        return rtrim($s, ',');
+        return implode('; ', $arr);
     }
 
     /**
-     * @return string
+     * @return string[]
      */
     public function prepare4response() {
-        // todo
-        return '';
+        $strs = array();
+        foreach ($this->cookies as $cookie) {
+            $strs[] = $cookie->formatted4response();
+        }
+        return $strs;
     }
 }
