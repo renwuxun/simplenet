@@ -19,7 +19,7 @@ class SimpleNet_Cookie {
      * @param string $key
      * @param string $value urlencode
      * @param int $expiresAt
-     * @param bool $domain
+     * @param bool|string $domain
      * @param string $path
      */
     public function __construct($key, $value = '', $expiresAt = 0, $domain = false, $path = '/') {
@@ -76,5 +76,40 @@ class SimpleNet_Cookie {
         }
 
         return $cookies;
+    }
+
+    /**
+     * @return string
+     */
+    public function getKey() {
+        return $this->key;
+    }
+
+    /**
+     * @return string
+     */
+    public function getValue() {
+        return $this->value;
+    }
+
+    /**
+     * @return int
+     */
+    public function getExpires() {
+        return $this->expires;
+    }
+
+    /**
+     * @return bool|string
+     */
+    public function getDomain() {
+        return $this->domain;
+    }
+
+    /**
+     * @return string
+     */
+    public function getPath() {
+        return $this->path;
     }
 }
