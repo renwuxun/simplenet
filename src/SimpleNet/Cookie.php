@@ -13,6 +13,7 @@ class SimpleNet_Cookie {
     protected $expires;
     protected $domain;
     protected $path;
+    protected $ext;
 
     /**
      * SimpleNet_Cookie constructor.
@@ -21,13 +22,15 @@ class SimpleNet_Cookie {
      * @param int $expiresAt
      * @param bool|string $domain
      * @param string $path
+     * @param string $ext
      */
-    public function __construct($key, $value = '', $expiresAt = 0, $domain = false, $path = '/') {
+    public function __construct($key, $value = '', $expiresAt = 0, $domain = false, $path = '/', $ext = '') {
         $this->key = $key;
         $this->value = $value;
         $this->expires = (int)$expiresAt;
         $this->domain = $domain;
         $this->path = $path;
+        $this->ext = $ext;
     }
 
     public function isExpired() {
@@ -39,6 +42,7 @@ class SimpleNet_Cookie {
         $this->expires>0 && $str .= '; expires=' . gmdate('D, d-M-Y H:i:s T', $this->expires);
         $this->domain && $str .= '; domain=' . $this->domain;
         $this->path && $str .= '; path=' . $this->path;
+        $this->ext && $str .= '; ' . $this->ext;
         return $str;
     }
 
@@ -57,25 +61,40 @@ class SimpleNet_Cookie {
         }
         $cookies = array();
         foreach ($m[1] as $v) {
-            $p = array();
+            $key = '';
+            $val = '';
+            $expires = 0;
+            $domain = false;
+            $path = '/';
+            $exts = array();
+
             $options = explode(';', $v);
             foreach ($options as $option) {
                 $option = trim($option);
                 $optionkv = explode('=', $option, 2);
-                if (!isset($optionkv[1])) { // 忽略secure、HttpOnly、
-                    continue;
+                switch ($optionkv[0]) {
+                    case 'expires':
+                        $expires = strtotime($optionkv[1]);
+                        break;
+                    case 'domain':
+                        $domain = $optionkv[1];
+                        break;
+                    case 'path':
+                        $path = $optionkv[1];
+                        break;
+                    case 'Max-Age'://懒得管它
+                        break;
+                    case 'secure':
+                    case 'HttpOnly':
+                        $exts[] = $optionkv[0];
+                        break;
+                    default:
+                        $key = $optionkv[0];
+                        $val = $optionkv[1];
                 }
-                $p[$optionkv[0]] = $optionkv[1];
             }
-            !isset($p['expires']) && $p['expires'] = 0;
-            !isset($p['domain']) && $p['domain'] = false;
-            !isset($p['path']) && $p['path'] = '/';
-            $expires = $p['expires'];unset($p['expires']);
-            $domain = $p['domain'];unset($p['domain']);
-            $path = $p['path'];unset($p['path']);
-            list($key, $val) = each($p); // key=val;不在首位时，会不会取到Max-Age之类的?
-            !is_numeric($expires) && $expires = strtotime($expires);
-            $cookies[] = new self($key, $val, $expires, $domain, $path);
+
+            $cookies[] = new self($key, $val, $expires, $domain, $path, implode('; ', $exts));
         }
 
         return $cookies;
