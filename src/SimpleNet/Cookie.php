@@ -30,7 +30,7 @@ class SimpleNet_Cookie {
         $this->path = $path;
     }
 
-    public function isExpires() {
+    public function isExpired() {
         return ($this->expires != 0 && time() > $this->expires);
     }
 
@@ -62,6 +62,9 @@ class SimpleNet_Cookie {
             foreach ($options as $option) {
                 $option = trim($option);
                 $optionkv = explode('=', $option, 2);
+                if (!isset($optionkv[1])) { // 忽略secure、HttpOnly、
+                    continue;
+                }
                 $p[$optionkv[0]] = $optionkv[1];
             }
             !isset($p['expires']) && $p['expires'] = 0;
@@ -70,7 +73,7 @@ class SimpleNet_Cookie {
             $expires = $p['expires'];unset($p['expires']);
             $domain = $p['domain'];unset($p['domain']);
             $path = $p['path'];unset($p['path']);
-            list($key, $val) = each($p);
+            list($key, $val) = each($p); // key=val;不在首位时，会不会取到Max-Age之类的?
             !is_numeric($expires) && $expires = strtotime($expires);
             $cookies[] = new self($key, $val, $expires, $domain, $path);
         }
