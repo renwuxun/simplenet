@@ -17,7 +17,7 @@ class SimpleNet_Cookie {
     /**
      * SimpleNet_Cookie constructor.
      * @param string $key
-     * @param string $value
+     * @param string $value urlencode
      * @param int $expiresAt
      * @param bool $domain
      * @param string $path
@@ -27,10 +27,11 @@ class SimpleNet_Cookie {
         $this->value = $value;
         $this->expires = (int)$expiresAt;
         $this->domain = $domain;
+        $this->path = $path;
     }
 
     public function isExpires() {
-        return time() > $this->expires;
+        return ($this->expires != 0 && time() > $this->expires);
     }
 
     public function formatted4response() {
@@ -57,11 +58,11 @@ class SimpleNet_Cookie {
         $cookies = array();
         foreach ($m[1] as $v) {
             $p = array();
-            $kvs = explode(';', $v);
-            foreach ($kvs as $kv) {
-                $kv = trim($kv);
-                $k2v = explode('=', $kv);
-                $p[$k2v[0]] = $k2v[1];
+            $options = explode(';', $v);
+            foreach ($options as $option) {
+                $option = trim($option);
+                $optionkv = explode('=', $option, 2);
+                $p[$optionkv[0]] = $optionkv[1];
             }
             !isset($p['expires']) && $p['expires'] = 0;
             !isset($p['domain']) && $p['domain'] = false;
@@ -69,13 +70,7 @@ class SimpleNet_Cookie {
             $expires = $p['expires'];unset($p['expires']);
             $domain = $p['domain'];unset($p['domain']);
             $path = $p['path'];unset($p['path']);
-            $key = '';
-            $val = '';
-            foreach ($p as $_k=>$_v) {
-                $key = $_k;
-                $val = $_v;
-                break;
-            }
+            list($key, $val) = each($p);
             !is_numeric($expires) && $expires = strtotime($expires);
             $cookies[] = new self($key, $val, $expires, $domain, $path);
         }
