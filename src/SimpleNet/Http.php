@@ -37,7 +37,7 @@ class SimpleNet_Http {
      * SimpleNet_Http constructor.
      * @param $tcp
      */
-    public function __construct(SimpleNet_Http $tcp = null) {
+    public function __construct(SimpleNet_Tcp $tcp = null) {
         $this->tcp = $tcp;
     }
 
