@@ -52,8 +52,7 @@ class SimpleNet_Tcp {
                         case 10060:
                             $this->error = "no server running port {$this->port} ($errno)";
                             break;
-                        default:
-                            $this->error = "could not open connection to {$this->host}:{$this->port} ($errno)";
+                        default:;
                     }
                 }
                 break;

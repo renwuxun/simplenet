@@ -33,6 +33,8 @@ class SimpleNet_Http {
     protected $statusCode = 0;
     protected $statusText = '';
 
+    protected $defaultHeaders = array();
+
     /**
      * SimpleNet_Http constructor.
      * @param $tcp
@@ -115,6 +117,8 @@ class SimpleNet_Http {
         if (!isset($_headers['Host'])) {
             $_headers['Host'] = preg_replace('#\w+://#', '', $this->getTcp()->getHost());
         }
+
+        $_headers = array_merge($this->defaultHeaders, $_headers);
 
         $sendHeader = self::buildHeader($uri, $_headers, strlen($sendBody), $method);
         unset($_headers);
@@ -201,6 +205,8 @@ class SimpleNet_Http {
      * @return string
      */
     public static function buildHeader($uri = '/', $headers = array(), $bodyLength = 0, $method = '') {
+        $uri = '/'.ltrim($uri, '/');
+
         if ($method == '') {
             $method = $bodyLength==0 ? 'GET' : 'POST';
         }
@@ -335,6 +341,27 @@ class SimpleNet_Http {
      */
     public function getStatusText() {
         return $this->statusText;
+    }
+
+    /**
+     * @return array
+     */
+    public function getDefaultHeaders() {
+        return $this->defaultHeaders;
+    }
+
+    /**
+     * @param array $defaultHeaders
+     * @return $this
+     */
+    public function setDefaultHeaders(array $defaultHeaders) {
+        $headers = array();
+        foreach($defaultHeaders as $k=>$v) {
+            $headers[ucwords($k, '-')] = $v;
+        }
+
+        $this->defaultHeaders = $headers;
+        return $this;
     }
 
 }
