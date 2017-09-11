@@ -35,8 +35,7 @@ class SimpleNet_Http {
 
     protected $defaultHeaders = array();
 
-    protected $sendTimeoutSec = 5;
-    protected $recvTimeoutSec = 15;
+    protected $timeoutsec = 15;
 
     /**
      * SimpleNet_Http constructor.
@@ -130,10 +129,6 @@ class SimpleNet_Http {
             return false;
         }
 
-        if ($this->tcp->feof() || preg_match('/Connection:\s*close/i', $this->recvHeader)) {
-            $this->tcp->close();
-        }
-
         if (preg_match('/Content-Encoding:\s*(gzip|deflate)/i', $this->recvHeader, $m)) {
             switch ($m[1]) {
                 case 'gzip':
@@ -166,13 +161,13 @@ class SimpleNet_Http {
         $this->error = '';
 
         if ($this->tcp->isClose()) {
-            if (!$this->tcp->connect()) {
+            if (!$this->tcp->connect($this->timeoutsec)) {
                 $this->error = $this->tcp->getError();
                 return false;
             }
         }
 
-        if (!$this->tcp->send($msg, $this->sendTimeoutSec)) {
+        if (!$this->tcp->send($msg)) {
             $this->error = $this->tcp->getError();
             return false;
         }
@@ -184,7 +179,7 @@ class SimpleNet_Http {
         }
 
         if (preg_match('/Content-Length:\s*(\d+)/i', $this->recvHeader,$m)){
-            if (!$this->tcp->recv(intval($m[1]), $this->recvTimeoutSec)) {
+            if (!$this->tcp->recv(intval($m[1]))) {
                 $this->error = $this->tcp->getError();
                 return false;
             }
@@ -195,6 +190,10 @@ class SimpleNet_Http {
             $this->error = 'bad response [' . $this->recvHeader . ']';
             $this->tcp->close(); // 响应协议错误
             return false;
+        }
+
+        if ($this->tcp->feof() || preg_match('/Connection:\s*close/i', $this->recvHeader)) {
+            $this->tcp->close();
         }
 
         return true;
@@ -240,7 +239,7 @@ class SimpleNet_Http {
     protected function readHeader($maxLine = 8192) {
         $this->recvHeader = '';
         do {
-            if (!$this->tcp->fgets($maxLine, $this->recvTimeoutSec)) {
+            if (!$this->tcp->fgets($maxLine)) {
                 $this->error = $this->tcp->getError();
                 return false;
             }
@@ -258,19 +257,19 @@ class SimpleNet_Http {
     protected function readChunkedBody() {
         $this->recvBody = '';
         do {
-            if (!$this->tcp->fgets(512, $this->recvTimeoutSec)) {
+            if (!$this->tcp->fgets(512)) {
                 $this->error = $this->tcp->getError();
                 return false;
             }
             $_chunk_size = intval(hexdec($this->tcp->getRecvData()));
             if ($_chunk_size > 0) {
-                if (!$this->tcp->recv($_chunk_size, $this->recvTimeoutSec)) {
+                if (!$this->tcp->recv($_chunk_size)) {
                     $this->error = $this->tcp->getError();
                     return false;
                 }
                 $this->recvBody .= $this->tcp->getRecvData();
             }
-            if (!$this->tcp->recv(2, $this->recvTimeoutSec)) { // skip \r\n
+            if (!$this->tcp->recv(2)) { // skip \r\n
                 $this->error = $this->tcp->getError();
                 return false;
             }
@@ -367,11 +366,7 @@ class SimpleNet_Http {
         return $this;
     }
 
-    public function setSendTimeoutSec($sendTimeoutSec = 5) {
-        $this->sendTimeoutSec = $sendTimeoutSec;
-    }
-
-    public function setRecvTimeoutSec($recvTimeoutSec = 15) {
-        $this->recvTimeoutSec = $recvTimeoutSec;
+    public function setTimeoutSec($sec) {
+        $this->timeoutsec = $sec;
     }
 }

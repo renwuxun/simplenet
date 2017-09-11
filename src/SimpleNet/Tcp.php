@@ -47,7 +47,7 @@ class SimpleNet_Tcp {
                             $this->error = "dns lookup failure ($errno)";
                             break;
                         case -5:
-                            $this->error = "connection refused or timed out ($errno) [timeoutSec=$timeoutsec]";
+                            $this->error = "connection refused or timed out ($errno) [timeoutsec=$timeoutsec]";
                             break;
                         case 10060:
                             $this->error = "no server running port {$this->port} ($errno)";
@@ -56,6 +56,9 @@ class SimpleNet_Tcp {
                     }
                 }
                 break;
+            }
+            if (is_resource($this->fp)) {
+                stream_set_timeout($this->fp, $timeoutsec);
             }
         } while (0);
 
@@ -79,10 +82,9 @@ class SimpleNet_Tcp {
     /**
      * 请自行确保(!isClose())
      * @param string $msg
-     * @param int $timeoutsec
      * @return bool
      */
-    public function send($msg, $timeoutsec = 5) {
+    public function send($msg) {
         $this->sendData = '';
 
         $this->error = '';
@@ -91,17 +93,12 @@ class SimpleNet_Tcp {
         $wrote = 0;
 
         do {
-            if (!@stream_set_timeout($this->fp, $timeoutsec)) {
-                $this->error = 'set fwrite timeout error';
-                $this->close();
-                return false;
-            }
             $_wrote = fwrite($this->fp, $msg, $length-$wrote);
             if ($_wrote === false) {
                 $this->error = 'fwrite() error [send]';
                 $info = @stream_get_meta_data($this->fp);
                 if (isset($info['timed_out']) && $info['timed_out']) {
-                    $this->error = 'tcp send timeout [timeoutSec='.$timeoutsec.']';
+                    $this->error = 'tcp send timeout';
                 }
                 $this->close();
                 return false;
@@ -116,27 +113,21 @@ class SimpleNet_Tcp {
 
     /**
      * @param $length
-     * @param int $timeoutsec
      * @return bool
      */
-    public function recv($length, $timeoutsec = 5) {
+    public function recv($length) {
         $this->error = '';
 
         $got = 0;
         $this->recvData = '';
 
         do {
-            if (!@stream_set_timeout($this->fp, $timeoutsec)) {
-                $this->error = 'set fread timeout error';
-                $this->close();
-                return false;
-            }
             $tmp = fread($this->fp, $length - $got);
             if (false === $tmp) {
                 $this->error = 'fread() error [recv]';
                 $info = @stream_get_meta_data($this->fp);
                 if (isset($info['timed_out']) && $info['timed_out']) {
-                    $this->error = 'connection recv timeout [recv] [timeoutSec='.$timeoutsec.']';
+                    $this->error = 'connection recv timeout [recv]';
                 }
                 $this->close();
                 return false;
@@ -150,17 +141,10 @@ class SimpleNet_Tcp {
 
     /**
      * @param null $maxLength
-     * @param int $timeoutsec
      * @return bool
      */
-    public function fgets($maxLength = null, $timeoutsec = 5) {
+    public function fgets($maxLength = null) {
         $this->error = '';
-
-        if (!@stream_set_timeout($this->fp, $timeoutsec)) {
-            $this->error = 'set fget timeout error';
-            $this->close();
-            return false;
-        }
 
         $this->recvData = fgets($this->fp, $maxLength);
 
@@ -168,7 +152,7 @@ class SimpleNet_Tcp {
             $this->error = 'fgets() error [fgets]';
             $info = @stream_get_meta_data($this->fp);
             if (isset($info['timed_out']) && $info['timed_out']) {
-                $this->error = 'connection recv timeout [fgets] [timeoutSec='.$timeoutsec.']';
+                $this->error = 'connection recv timeout [fgets]';
             }
             $this->close();
             return false;
