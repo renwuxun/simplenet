@@ -42,7 +42,7 @@ class SimpleNet_Udp {
                             $this->error = "connection refused or timed out ($errno)";
                             break;
                         case 10060:
-                            $this->error = "no server running port {$this->port} ($errno)";
+                            $this->error = "no server running port {$this->port} ($errno) [timeoutSec=$timeoutsec]";
                             break;
                         default:
                             $this->error = "could not open connection to {$this->host}:{$this->port} ($errno)";
@@ -78,7 +78,7 @@ class SimpleNet_Udp {
                 $this->error = 'fwrite() error [send]';
                 $info = @stream_get_meta_data($this->fp);
                 if (isset($info['timed_out']) && $info['timed_out']) {
-                    $this->error = 'udp send timeout';
+                    $this->error = 'udp send timeout [timeoutSec='.$timeoutsec.']';
                 }
                 $this->close();
                 return false;

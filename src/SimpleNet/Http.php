@@ -35,6 +35,9 @@ class SimpleNet_Http {
 
     protected $defaultHeaders = array();
 
+    protected $sendTimeoutSec = 5;
+    protected $recvTimeoutSec = 15;
+
     /**
      * SimpleNet_Http constructor.
      * @param $tcp
@@ -169,7 +172,7 @@ class SimpleNet_Http {
             }
         }
 
-        if (!$this->tcp->send($msg)) {
+        if (!$this->tcp->send($msg, $this->sendTimeoutSec)) {
             $this->error = $this->tcp->getError();
             return false;
         }
@@ -181,7 +184,7 @@ class SimpleNet_Http {
         }
 
         if (preg_match('/Content-Length:\s*(\d+)/i', $this->recvHeader,$m)){
-            if (!$this->tcp->recv(intval($m[1]))) {
+            if (!$this->tcp->recv(intval($m[1]), $this->recvTimeoutSec)) {
                 $this->error = $this->tcp->getError();
                 return false;
             }
@@ -237,7 +240,7 @@ class SimpleNet_Http {
     protected function readHeader($maxLine = 8192) {
         $this->recvHeader = '';
         do {
-            if (!$this->tcp->fgets($maxLine)) {
+            if (!$this->tcp->fgets($maxLine, $this->recvTimeoutSec)) {
                 $this->error = $this->tcp->getError();
                 return false;
             }
@@ -255,19 +258,19 @@ class SimpleNet_Http {
     protected function readChunkedBody() {
         $this->recvBody = '';
         do {
-            if (!$this->tcp->fgets(512)) {
+            if (!$this->tcp->fgets(512, $this->recvTimeoutSec)) {
                 $this->error = $this->tcp->getError();
                 return false;
             }
             $_chunk_size = intval(hexdec($this->tcp->getRecvData()));
             if ($_chunk_size > 0) {
-                if (!$this->tcp->recv($_chunk_size)) {
+                if (!$this->tcp->recv($_chunk_size, $this->recvTimeoutSec)) {
                     $this->error = $this->tcp->getError();
                     return false;
                 }
                 $this->recvBody .= $this->tcp->getRecvData();
             }
-            if (!$this->tcp->recv(2)) { // skip \r\n
+            if (!$this->tcp->recv(2, $this->recvTimeoutSec)) { // skip \r\n
                 $this->error = $this->tcp->getError();
                 return false;
             }
@@ -364,4 +367,11 @@ class SimpleNet_Http {
         return $this;
     }
 
+    public function setSendTimeoutSec($sendTimeoutSec = 5) {
+        $this->sendTimeoutSec = $sendTimeoutSec;
+    }
+
+    public function setRecvTimeoutSec($recvTimeoutSec = 15) {
+        $this->recvTimeoutSec = $recvTimeoutSec;
+    }
 }
