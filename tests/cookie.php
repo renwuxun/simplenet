@@ -6,7 +6,7 @@
  * Time: 9:28
  */
 
-require __DIR__.'/../vendor/autoload.php';
+require dirname(__DIR__).'/vendor/autoload.php';
 
 
 $responseHeader = "HTTP/1.1 200 OK\r
