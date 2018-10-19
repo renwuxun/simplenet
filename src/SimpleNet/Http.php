@@ -127,7 +127,7 @@ class SimpleNet_Http {
         if ($this->referer) {
             $_headers['Referer'] = $this->referer;
         }
-        $this->referer = $this->tcp->getHost();
+        $this->referer = $_headers['Host'];
         if ($this->tcp->getPort() > 0) {
             $this->referer .= ':'.$this->tcp->getPort();
         }
