@@ -37,6 +37,8 @@ class SimpleNet_Http {
 
     protected $timeoutsec = 15;
 
+    protected $referer = '';
+
     /**
      * SimpleNet_Http constructor.
      * @param $tcp
@@ -121,6 +123,15 @@ class SimpleNet_Http {
         }
 
         $_headers = array_merge($this->defaultHeaders, $_headers);
+
+        if ($this->referer) {
+            $_headers['Referer'] = $this->referer;
+        }
+        $this->referer = $this->tcp->getHost();
+        if ($this->tcp->getPort() > 0) {
+            $this->referer .= ':'.$this->tcp->getPort();
+        }
+        $this->referer .= $uri;
 
         $sendHeader = self::buildHeader($uri, $_headers, strlen($sendBody), $method);
         unset($_headers);
